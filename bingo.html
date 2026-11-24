@@ -1,0 +1,1230 @@
+<!-- bingo.html : 빙고 (오늘도 전산 · 단일 파일 / 서버 불필요) -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>빙고 만들기 | 오늘도 전산</title>
+<style>
+:root{
+  --bg:#f2f1f6; --card:#ffffff; --ink:#1c1c1e; --sub:#8e8e93;
+  --line:#d8d8dc; --accent:#e8a317; --accent2:#f3d08a;
+  --cell:#ffffff; --cellink:#1c1c1e; --radius:14px; --fs:1;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html{scroll-behavior:smooth;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","맑은 고딕",sans-serif;
+  background:var(--bg); color:var(--ink);
+  padding:12px 12px calc(120px + env(safe-area-inset-bottom));
+  min-height:100vh; transition:background .25s;
+}
+.wrap{max-width:560px;margin:0 auto;}
+h1{font-size:22px;margin:6px 0 6px;text-align:center;letter-spacing:-.5px;}
+h1 small{display:block;font-size:12px;color:var(--sub);font-weight:400;margin-top:4px;}
+.topLink{text-align:center;margin:0 0 14px;}
+.topLink a{display:inline-block;font-size:13px;color:var(--accent);text-decoration:none;font-weight:700;
+  border:1.5px solid var(--accent);border-radius:999px;padding:6px 14px;}
+.card{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:12px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);}
+.card h2{font-size:14px;margin:0 0 10px;color:var(--sub);font-weight:600;letter-spacing:-.3px;}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.row+.row{margin-top:8px;}
+label.lbl{font-size:13px;color:var(--sub);min-width:70px;}
+button{font-family:inherit;font-size:14px;border:1.5px solid var(--line);background:#fff;color:var(--ink);
+  border-radius:10px;padding:9px 12px;cursor:pointer;transition:.15s;}
+button:active{transform:scale(.96);}
+button.sel{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;
+  flex:1;padding:14px;font-size:16px;border-radius:12px;min-height:52px;}
+button.wide{display:block;width:100%;flex:none;min-height:56px;padding:16px;font-size:17px;white-space:nowrap;}
+button.ghost{background:transparent;}
+button.danger{color:#d64545;border-color:#f0c4c4;}
+input[type=text],input[type=number]{font-family:inherit;font-size:16px;padding:9px 10px;
+  border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%;}
+input[type=range]{flex:1;accent-color:var(--accent);}
+/* ---------- 순차 입력 바 ---------- */
+#stampBar{position:sticky;top:0;z-index:45;background:var(--accent);color:#fff;
+  border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 3px 12px rgba(0,0,0,.18);}
+#stampBar .sLeft{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+#stampBar .sLbl{font-size:12px;opacity:.85;white-space:nowrap;}
+#stampBar .sNum{font-size:34px;font-weight:900;line-height:1;letter-spacing:-1px;
+  min-width:56px;text-align:center;background:rgba(255,255,255,.22);border-radius:10px;padding:6px 10px;}
+#stampBar .sRight{display:flex;gap:6px;}
+#stampBar .sRight button{background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.45);
+  color:#fff;font-weight:700;min-width:46px;padding:10px 8px;font-size:16px;}
+#stampBar .sProg{flex-basis:100%;font-size:12px;opacity:.9;}
+/* ---------- board ---------- */
+#boardWrap{background:var(--card);border-radius:var(--radius);padding:12px;margin-bottom:12px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);}
+#headerRow{display:grid;gap:4px;margin-bottom:4px;}
+#headerRow div{display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;
+  border-radius:8px;aspect-ratio:1/.45;font-size:calc(18px*var(--fs));}
+#board{display:grid;gap:4px;}
+.cell{position:relative;display:flex;align-items:center;justify-content:center;
+  aspect-ratio:1/1;background:var(--cell);color:var(--cellink);
+  border:2px solid var(--line);border-radius:10px;
+  font-size:calc(17px*var(--fs));font-weight:700;text-align:center;
+  padding:2px;word-break:keep-all;overflow-wrap:anywhere;line-height:1.15;cursor:pointer;
+  transition:transform .1s, background .15s;overflow:hidden;}
+.cell.long{font-size:calc(13px*var(--fs));}
+.cell:active{transform:scale(.94);}
+.cell.empty{color:#c9c9ce;font-weight:400;border-style:dashed;}
+.cell.free{background:#f1f1f3;color:var(--sub);font-size:calc(12px*var(--fs));}
+.cell.next{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent2) inset;}
+.cell.just{animation:flash .45s ease-out;}
+@keyframes flash{0%{background:var(--accent2);transform:scale(1.12)}100%{transform:scale(1)}}
+.cell .mk{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:calc(34px*var(--fs));font-weight:900;pointer-events:none;animation:pop .18s ease-out;}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.cell.linehit{box-shadow:0 0 0 3px #4caf50 inset;}
+/* ---------- misc ---------- */
+.stat{display:flex;gap:8px;align-items:center;justify-content:space-between;
+  font-size:14px;margin-bottom:10px;padding:0 2px;}
+.badge{background:var(--accent);color:#fff;border-radius:999px;padding:5px 13px;font-weight:800;font-size:14px;}
+.called{display:flex;flex-wrap:wrap;gap:5px;max-height:92px;overflow-y:auto;margin-top:8px;}
+.called span{background:#eee;border-radius:7px;padding:4px 9px;font-size:13px;}
+.called span.last{background:var(--accent);color:#fff;font-weight:700;}
+.hide{display:none!important;}
+.hint{font-size:12px;color:var(--sub);line-height:1.5;margin-top:8px;}
+.swatch{width:34px;height:34px;border-radius:9px;border:2px solid #fff;
+  box-shadow:0 0 0 1.5px var(--line);cursor:pointer;padding:0;}
+.swatch.sel{box-shadow:0 0 0 3px var(--accent);}
+/* ---------- 공유 / QR ---------- */
+#qrBox{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:12px;}
+#qrCanvas{width:210px;height:210px;image-rendering:pixelated;background:#fff;
+  border-radius:12px;padding:10px;box-shadow:0 0 0 1.5px var(--line);}
+#shareUrl{font-size:11px;word-break:break-all;color:var(--sub);text-align:center;
+  background:rgba(0,0,0,.04);padding:8px 10px;border-radius:8px;width:100%;line-height:1.5;}
+.warn{font-size:12px;line-height:1.6;color:#8a5a00;background:#fff5e0;
+  border:1px solid #f0d9a8;border-radius:10px;padding:10px 12px;margin-top:10px;}
+.adnotice{font-size:12px;color:var(--sub);line-height:1.5;margin:0 0 10px;
+  padding:8px 10px;background:rgba(0,0,0,.04);border-radius:8px;}
+#adSlot{min-height:60px;display:flex;justify-content:center;align-items:center;overflow:hidden;}
+#adSlot img,#adSlot iframe{max-width:100%;}
+.adPlaceholder{width:100%;padding:26px 10px;text-align:center;color:#c9c9ce;
+  font-size:14px;border:2px dashed var(--line);border-radius:10px;line-height:1.7;}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
+  background:rgba(28,28,30,.93);color:#fff;padding:11px 20px;border-radius:999px;
+  font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:70;max-width:90vw;text-align:center;}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:50;}
+/* ---------- 사용방법 ---------- */
+#guide{scroll-margin-top:12px;}
+#guide h2{font-size:17px;color:var(--ink);font-weight:800;margin:2px 0 12px;}
+#guide details{border:1.5px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden;
+  scroll-margin-top:12px;}
+#guide summary{cursor:pointer;padding:12px 14px;font-weight:700;font-size:15px;list-style:none;
+  display:flex;justify-content:space-between;align-items:center;}
+#guide summary::-webkit-details-marker{display:none;}
+#guide summary::after{content:'＋';color:var(--accent);font-weight:900;}
+#guide details[open] summary::after{content:'－';}
+#guide details[open] summary{border-bottom:1px solid var(--line);}
+#guide .gBody{padding:10px 14px 14px;font-size:14px;line-height:1.75;}
+#guide .gBody ol,#guide .gBody ul{margin:4px 0;padding-left:20px;}
+#guide .gBody li{margin:2px 0;}
+#guide .gBody b{color:var(--accent);}
+#guide .tip{background:rgba(0,0,0,.04);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:8px;}
+#guide .toc{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+#guide .toc a{font-size:12px;text-decoration:none;color:var(--ink);background:rgba(0,0,0,.05);
+  border-radius:999px;padding:5px 11px;}
+.backTop{display:block;text-align:center;font-size:13px;color:var(--sub);margin-top:10px;text-decoration:none;}
+/* ---------- 자체 대화상자 ---------- */
+.dlgBack{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;
+  align-items:center;justify-content:center;z-index:65;padding:22px;}
+.dlgBox{background:var(--card);color:var(--ink);border-radius:18px;padding:22px 20px;
+  width:100%;max-width:340px;animation:pop .22s ease-out;box-shadow:0 10px 40px rgba(0,0,0,.3);}
+.dlgBox h3{margin:0 0 8px;font-size:18px;}
+.dlgBox p{margin:0 0 16px;font-size:14px;color:var(--sub);line-height:1.6;}
+.dlgBox input{margin-bottom:16px;}
+.dlgBox .dlgRow{display:flex;gap:8px;}
+.dlgBox .dlgRow button{flex:1;padding:13px;font-size:15px;font-weight:600;min-height:50px;}
+.dlgList{max-height:240px;overflow-y:auto;margin-bottom:14px;display:flex;flex-direction:column;gap:6px;}
+.dlgList .dlgItem{display:flex;gap:6px;}
+.dlgList .dlgItem button:first-child{flex:1;text-align:left;padding:13px;}
+.dlgList .dlgItem button.del{flex:none;color:#d64545;border-color:#f0c4c4;}
+body.t-hanbok{--bg:#3b1414;--card:#fff8ee;--ink:#2b1a12;--sub:#9a7f6a;--line:#e2cdb4;--accent:#c0392b;--accent2:#f0c9a0;--cell:#fffdf8;--cellink:#2b1a12;}
+body.t-birth{--bg:#fdeef4;--card:#fff;--ink:#3b2233;--sub:#a98aa0;--line:#f0d5e4;--accent:#e0679a;--accent2:#f7c5da;--cell:#fff;--cellink:#3b2233;}
+body.t-travel{--bg:#e6f3fa;--card:#fff;--ink:#12303f;--sub:#7fa3b5;--line:#cfe4ef;--accent:#2b8cbe;--accent2:#b3ddf2;--cell:#fff;--cellink:#12303f;}
+body.t-dark{--bg:#101014;--card:#1c1c22;--ink:#f2f2f5;--sub:#8b8b95;--line:#35353f;--accent:#ffb340;--accent2:#5c4520;--cell:#25252d;--cellink:#f2f2f5;}
+body.t-dark .cell.free{background:#2e2e38;}
+body.t-dark .called span{background:#2e2e38;color:#ddd;}
+body.t-dark input[type=text],body.t-dark input[type=number],body.t-dark button{background:#25252d;color:#f2f2f5;}
+body.t-dark button.sel,body.t-dark button.primary{background:var(--accent);color:#1c1c22;}
+body.t-dark #stampBar{color:#1c1c22;}
+body.t-dark #stampBar .sRight button{color:#1c1c22;border-color:rgba(0,0,0,.3);background:rgba(255,255,255,.35);}
+body.t-dark #guide .tip,body.t-dark #guide .toc a{background:rgba(255,255,255,.07);}
+body.t-hanbok h1,body.t-dark h1{color:#fff;}
+</style>
+</head>
+<body>
+<div class="wrap" id="top">
+<h1>🎯 빙고<small>설치 없이 · 휴대폰 / PC 모두 · 같이 하기 지원</small></h1>
+<p class="topLink"><a href="#guide">❓ 사용방법 보기</a></p>
+
+<!-- ================= 설정 ================= -->
+<div class="card" id="setupCard">
+  <h2>1. 판 만들기</h2>
+  <div class="row">
+    <label class="lbl">빙고 종류</label>
+    <button type="button" class="typeBtn sel" data-type="num">숫자</button>
+    <button type="button" class="typeBtn" data-type="word">단어</button>
+  </div>
+  <div class="row">
+    <label class="lbl">칸 개수</label>
+    <button type="button" class="sizeBtn" data-size="3">3 × 3</button>
+    <button type="button" class="sizeBtn" data-size="4">4 × 4</button>
+    <button type="button" class="sizeBtn sel" data-size="5">5 × 5</button>
+  </div>
+  <div class="row" id="numOpt">
+    <label class="lbl">숫자 범위</label>
+    <span style="font-size:14px">1 ~</span>
+    <input type="number" id="maxNum" value="25" min="9" max="999" style="width:80px">
+    <button type="button" id="bingoHeadBtn" class="sel" style="font-size:13px">B I N G O 머리글</button>
+  </div>
+  <div class="row" id="wordOpt">
+    <label class="lbl">주제 추천</label>
+    <button type="button" class="tplBtn" data-tpl="myeong">명절</button>
+    <button type="button" class="tplBtn" data-tpl="travel">여행</button>
+    <button type="button" class="tplBtn" data-tpl="birth">생일</button>
+    <button type="button" class="tplBtn" data-tpl="food">음식</button>
+    <button type="button" class="tplBtn sel" data-tpl="family">가족</button>
+    <button type="button" class="tplBtn" data-tpl="region">지역명</button>
+    <button type="button" class="tplBtn" data-tpl="country">나라명</button>
+  </div>
+  <div class="row" id="freeOpt">
+    <label class="lbl">가운데 칸</label>
+    <button type="button" id="freeBtn">FREE 사용</button>
+  </div>
+  <div class="row">
+    <label class="lbl">승리 조건</label>
+    <input type="number" id="targetLines" value="5" min="1" max="12" style="width:70px">
+    <span style="font-size:14px">줄 먼저 완성</span>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button type="button" class="primary" id="makeBtn">판 만들기 →</button>
+  </div>
+</div>
+
+<!-- ================= 순차 입력 바 ================= -->
+<div id="stampBar" class="hide">
+  <div class="sLeft">
+    <span class="sLbl">다음 입력</span>
+    <span class="sNum" id="stampNum">1</span>
+  </div>
+  <div class="sRight">
+    <button type="button" id="stampMinus" title="이전 값">−</button>
+    <button type="button" id="stampPlus" title="다음 값">＋</button>
+    <button type="button" id="stampSet" title="직접 지정">지정</button>
+  </div>
+  <div class="sProg" id="stampProg"></div>
+</div>
+
+<!-- ================= 편집 ================= -->
+<div class="card hide" id="editCard">
+  <h2>2. 칸 채우기</h2>
+  <div class="row" id="modeRow">
+    <label class="lbl">입력 방식</label>
+    <button type="button" class="modeBtn sel" data-mode="stamp">순서대로 넣기</button>
+    <button type="button" class="modeBtn" data-mode="type">직접 입력</button>
+  </div>
+  <div class="row hide" id="typeRow">
+    <input type="text" id="inp" placeholder="칸을 누르고 여기에 입력 후 Enter" enterkeyhint="next">
+  </div>
+  <div class="row">
+    <button type="button" id="autoBtn">🎲 자동 채우기</button>
+    <button type="button" id="shuffleBtn">🔀 섞기</button>
+    <button type="button" id="undoEditBtn">↩ 되돌리기</button>
+    <button type="button" id="clearBtn" class="danger">전체 비우기</button>
+  </div>
+  <div class="row">
+    <button type="button" class="primary" id="startBtn">게임 시작 →</button>
+  </div>
+  <p class="hint" id="editHint"></p>
+</div>
+
+<!-- ================= 게임 상태 ================= -->
+<div class="hide" id="playBar">
+  <div class="stat">
+    <span class="badge" id="lineBadge">0 빙고</span>
+    <span style="color:var(--sub);font-size:13px" id="progressTxt"></span>
+  </div>
+</div>
+
+<!-- ================= 보드 ================= -->
+<div id="boardWrap" class="hide">
+  <div id="headerRow"></div>
+  <div id="board"></div>
+</div>
+
+<!-- ================= 진행 ================= -->
+<div class="card hide" id="playCard">
+  <h2>3. 진행</h2>
+  <div class="row">
+    <button type="button" id="undoBtn">↩ 되돌리기</button>
+    <button type="button" id="resetMarkBtn">체크 초기화</button>
+    <button type="button" id="backEditBtn" class="ghost">← 편집으로</button>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <input type="text" id="callInp" placeholder="부른 숫자·단어 기록 (Enter)" enterkeyhint="done">
+  </div>
+  <div class="called" id="calledList"></div>
+</div>
+
+<!-- ================= 같이 하기 (QR) ================= -->
+<div class="card hide" id="shareCard">
+  <h2>같이 하기 — QR · 링크 · 코드</h2>
+  <div class="row">
+    <label class="lbl">나눠줄 판</label>
+    <button type="button" class="shModeBtn sel" data-sh="R">각자 다른 판</button>
+    <button type="button" class="shModeBtn" data-sh="S">모두 같은 판</button>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <label class="lbl">공유 주소</label>
+    <input type="text" id="baseUrl" placeholder="비워두면 지금 페이지 주소 사용">
+  </div>
+  <p class="hint" id="baseHint"></p>
+  <div class="row" style="margin-top:10px">
+    <button type="button" class="primary" id="qrBtn">QR 만들기</button>
+  </div>
+  <div id="qrBox" class="hide">
+    <canvas id="qrCanvas" width="210" height="210"></canvas>
+    <div id="shareUrl"></div>
+    <div class="row">
+      <button type="button" id="copyBtn">🔗 링크 복사</button>
+      <button type="button" id="qrSaveBtn">🖼 QR 저장</button>
+    </div>
+  </div>
+  <div id="fileWarn" class="warn hide"></div>
+  <div class="row" style="margin-top:14px">
+    <button type="button" id="codeBtn">🔢 참가 코드 만들기</button>
+    <button type="button" id="joinBtn">📥 코드로 참가</button>
+  </div>
+  <p class="hint">QR이 어려운 상황이라면 <b>참가 코드</b>로도 판을 나눌 수 있습니다. 참가자가 각자 이 페이지를 열고, 받은 코드를 「코드로 참가」에 붙여넣으면 같은 규칙의 판이 만들어집니다.</p>
+</div>
+
+<!-- ================= 꾸미기 ================= -->
+<div class="card hide" id="styleCard">
+  <h2>꾸미기</h2>
+  <div class="row">
+    <label class="lbl">체크 모양</label>
+    <button type="button" class="mkBtn sel" data-mk="fill">색칠</button>
+    <button type="button" class="mkBtn" data-mk="x">✕</button>
+    <button type="button" class="mkBtn" data-mk="o">○</button>
+    <button type="button" class="mkBtn" data-mk="stamp">도장</button>
+  </div>
+  <div class="row">
+    <label class="lbl">색상</label>
+    <div class="row" id="colorRow" style="gap:8px"></div>
+  </div>
+  <div class="row">
+    <label class="lbl">테마</label>
+    <button type="button" class="thBtn sel" data-th="">기본</button>
+    <button type="button" class="thBtn" data-th="t-hanbok">명절</button>
+    <button type="button" class="thBtn" data-th="t-birth">생일</button>
+    <button type="button" class="thBtn" data-th="t-travel">여행</button>
+    <button type="button" class="thBtn" data-th="t-dark">다크</button>
+  </div>
+  <div class="row">
+    <label class="lbl">글자 크기</label>
+    <input type="range" id="fsRange" min="70" max="170" value="100">
+    <span id="fsVal" style="font-size:13px;color:var(--sub);width:42px;text-align:right">100%</span>
+  </div>
+</div>
+
+<!-- ================= 저장 ================= -->
+<div class="card hide" id="saveCard">
+  <h2>저장 / 공유</h2>
+  <div class="row">
+    <button type="button" id="imgBtn">🖼 이미지로 저장</button>
+    <button type="button" id="saveBtn">💾 판 저장</button>
+    <button type="button" id="loadBtn">📂 불러오기</button>
+  </div>
+  <p class="hint">저장한 판은 이 브라우저에 보관됩니다. 이미지로 저장하면 카카오톡으로 바로 공유할 수 있습니다.</p>
+</div>
+
+<!-- ================= 광고 자리 ================= -->
+<div class="card hide" id="adCard">
+  <p class="adnotice">이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>
+  <div id="adSlot">
+    <!-- ▼▼▼ 쿠팡 파트너스 배너 코드를 이 줄 아래에 붙여넣으세요 ▼▼▼ -->
+    <div class="adPlaceholder">광고 자리<br><small>쿠팡 파트너스 배너 코드를 넣는 위치</small></div>
+    <!-- ▲▲▲ 여기까지 ▲▲▲ -->
+  </div>
+</div>
+
+<div class="card hide" id="newCard">
+  <button type="button" class="primary wide" id="newBtn"
+    style="background:transparent;color:var(--accent);border:2px solid var(--accent)">처음부터 새로 만들기</button>
+</div>
+
+<!-- ================= 사용방법 (링크: 페이지주소#guide) ================= -->
+<div class="card" id="guide">
+  <h2>📖 빙고 사용방법</h2>
+  <div class="toc">
+    <a href="#g-quick">빠른 시작</a>
+    <a href="#g-make">판 만들기</a>
+    <a href="#g-fill">칸 채우기</a>
+    <a href="#g-play">게임 진행</a>
+    <a href="#g-share">같이 하기</a>
+    <a href="#g-save">꾸미기·저장</a>
+    <a href="#g-faq">자주 묻는 질문</a>
+  </div>
+
+  <details id="g-quick" open>
+    <summary>⚡ 1분 빠른 시작</summary>
+    <div class="gBody">
+      <ol>
+        <li><b>판 만들기 →</b> 를 누릅니다.</li>
+        <li><b>🎲 자동 채우기</b> 를 누르면 칸이 한 번에 채워집니다.</li>
+        <li><b>게임 시작 →</b> 을 누릅니다.</li>
+        <li>사회자가 부르는 숫자(단어)가 내 판에 있으면 그 칸을 누릅니다.</li>
+        <li>목표한 줄 수를 먼저 완성하면 🎉 축하 화면이 나옵니다.</li>
+      </ol>
+      <div class="tip">설치나 회원가입은 필요 없습니다. 휴대폰과 PC 어디서든 이 페이지만 열면 됩니다.</div>
+    </div>
+  </details>
+
+  <details id="g-make">
+    <summary>1️⃣ 판 만들기 (설정)</summary>
+    <div class="gBody">
+      <ul>
+        <li><b>빙고 종류</b> — 숫자 빙고 또는 단어 빙고를 고릅니다.</li>
+        <li><b>칸 개수</b> — 3×3, 4×4, 5×5 중에서 고릅니다. 어린아이와 함께라면 3×3이 좋습니다.</li>
+        <li><b>숫자 범위</b> — 숫자 빙고에서 사용할 숫자 범위입니다. 예: 1~50으로 하면 판마다 숫자가 달라져 더 재밌습니다.</li>
+        <li><b>B I N G O 머리글</b> — 5×5 숫자 빙고에서 판 위에 BINGO 글자를 표시합니다.</li>
+        <li><b>주제 추천</b> — 단어 빙고에서 명절·여행·생일·음식·가족·지역명·나라명 중 하나를 고르면, 자동 채우기 때 그 주제 단어로 채워집니다.</li>
+        <li><b>가운데 칸 FREE</b> — 3×3, 5×5에서 가운데 칸을 처음부터 체크된 칸으로 둡니다.</li>
+        <li><b>승리 조건</b> — 몇 줄을 완성하면 이기는지 정합니다. (가로·세로·대각선 모두 인정)</li>
+      </ul>
+    </div>
+  </details>
+
+  <details id="g-fill">
+    <summary>2️⃣ 칸 채우기</summary>
+    <div class="gBody">
+      <ul>
+        <li><b>순서대로 넣기</b> (숫자 빙고) — 위 주황색 바에 보이는 번호가 다음에 들어갈 숫자입니다. 원하는 칸을 누를 때마다 1, 2, 3… 순서로 들어갑니다. <b>−/＋</b> 로 번호를 바꾸거나 <b>지정</b> 으로 직접 고를 수 있습니다.</li>
+        <li><b>직접 입력</b> — 칸을 누르고 입력창에 쓴 뒤 Enter를 누르면 다음 빈 칸으로 넘어갑니다. 단어 빙고는 이 방식을 사용합니다.</li>
+        <li><b>🎲 자동 채우기</b> — 숫자 범위나 선택한 주제로 모든 칸을 무작위로 채웁니다.</li>
+        <li><b>🔀 섞기</b> — 채운 값은 그대로 두고 위치만 섞습니다.</li>
+        <li>채운 칸을 다시 누르면 지워지고, <b>↩ 되돌리기</b> 로 직전 상태로 돌아갈 수 있습니다.</li>
+      </ul>
+      <div class="tip">같은 값은 두 번 넣을 수 없습니다. 빈 칸이 남아 있으면 게임을 시작할 수 없습니다.</div>
+    </div>
+  </details>
+
+  <details id="g-play">
+    <summary>3️⃣ 게임 진행</summary>
+    <div class="gBody">
+      <ul>
+        <li>불린 값이 있는 칸을 누르면 체크되고, 다시 누르면 체크가 풀립니다.</li>
+        <li>완성된 줄은 초록색 테두리로 표시되고, 위에 <b>○ 빙고</b> 개수가 나옵니다.</li>
+        <li><b>부른 숫자·단어 기록</b> 칸에 입력하면 지금까지 나온 값을 한눈에 볼 수 있습니다. (사회자용)</li>
+        <li>잘못 눌렀다면 <b>↩ 되돌리기</b>, 처음부터 다시 하려면 <b>체크 초기화</b>.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details id="g-share">
+    <summary>4️⃣ 같이 하기 (QR · 링크 · 참가 코드)</summary>
+    <div class="gBody">
+      <ul>
+        <li><b>각자 다른 판</b> — 같은 규칙으로 사람마다 다른 판이 만들어집니다. 일반적인 빙고 게임 방식입니다.</li>
+        <li><b>모두 같은 판</b> — 내가 만든 판을 그대로 나눠줍니다. 칸을 모두 채운 뒤 사용하세요.</li>
+        <li><b>QR 만들기</b> — 화면에 나온 QR을 다른 사람이 휴대폰 카메라로 찍으면 바로 판이 열립니다. <b>🔗 링크 복사</b> 로 카톡에 보내도 됩니다.</li>
+        <li><b>참가 코드</b> — 코드를 복사해 보내면, 받은 사람이 이 페이지에서 <b>📥 코드로 참가</b> 에 붙여넣어 판을 만듭니다.</li>
+      </ul>
+      <div class="tip">사회자는 숫자를 부르고, 참가자는 각자 휴대폰에서 칸을 누르면 됩니다. 종이 없이도 여러 명이 함께할 수 있습니다.</div>
+    </div>
+  </details>
+
+  <details id="g-save">
+    <summary>🎨 꾸미기 · 저장</summary>
+    <div class="gBody">
+      <ul>
+        <li><b>체크 모양</b> — 색칠, ✕, ○, 도장 중에서 고릅니다.</li>
+        <li><b>색상 · 테마</b> — 체크 색과 화면 분위기(명절·생일·여행·다크)를 바꿉니다.</li>
+        <li><b>글자 크기</b> — 어르신이나 큰 화면에서는 크게 키워 보세요.</li>
+        <li><b>🖼 이미지로 저장</b> — 판을 그림 파일로 저장합니다. 출력해서 종이 빙고로 써도 됩니다.</li>
+        <li><b>💾 판 저장 / 📂 불러오기</b> — 만든 판을 이 브라우저에 저장했다가 다음에 다시 불러옵니다.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details id="g-faq">
+    <summary>💬 자주 묻는 질문</summary>
+    <div class="gBody">
+      <ul>
+        <li><b>저장한 판이 안 보여요.</b> — 판은 저장한 그 브라우저에만 보관됩니다. 다른 기기나 시크릿 모드에서는 보이지 않습니다.</li>
+        <li><b>QR이 안 만들어져요.</b> — 파일을 내 PC에서 직접 연 경우에는 인터넷 주소가 없어 QR을 만들 수 없습니다. 이 페이지 주소로 접속하거나 참가 코드를 사용하세요.</li>
+        <li><b>소리가 안 나요.</b> — 휴대폰이 무음 모드인지 확인하세요.</li>
+        <li><b>순서대로 넣기 버튼이 없어요.</b> — 숫자 빙고 전용 기능입니다. 단어 빙고는 직접 입력이나 자동 채우기를 사용합니다.</li>
+      </ul>
+    </div>
+  </details>
+
+  <a class="backTop" href="#top">▲ 맨 위로</a>
+</div>
+
+</div>
+<canvas id="fx"></canvas>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+/* ==================== QR 인코더 ==================== */
+const QR=(function(){
+  const EXP=new Uint8Array(512), LOG=new Uint8Array(256);
+  (function(){ let x=1; for(let i=0;i<255;i++){ EXP[i]=x; LOG[x]=i; x<<=1; if(x&256) x^=0x11D; }
+    for(let i=255;i<512;i++) EXP[i]=EXP[i-255]; })();
+  const mul=(a,b)=>(a===0||b===0)?0:EXP[LOG[a]+LOG[b]];
+  function rsGen(n){ let p=[1];
+    for(let i=0;i<n;i++){ const q=new Array(p.length+1).fill(0);
+      for(let j=0;j<p.length;j++){ q[j]^=mul(p[j],1); q[j+1]^=mul(p[j],EXP[i]); } p=q; } return p; }
+  function rsEnc(d,n){ const g=rsGen(n), r=new Array(d.length+n).fill(0);
+    for(let i=0;i<d.length;i++) r[i]=d[i];
+    for(let i=0;i<d.length;i++){ const f=r[i]; if(!f) continue;
+      for(let j=0;j<g.length;j++) r[i+j]^=mul(g[j],f); }
+    return r.slice(d.length); }
+  const RS={L:{1:[7,1,19,0,0],2:[10,1,34,0,0],3:[15,1,55,0,0],4:[20,1,80,0,0],5:[26,1,108,0,0],
+      6:[18,2,68,0,0],7:[20,2,78,0,0],8:[24,2,97,0,0],9:[30,2,116,0,0],10:[18,2,68,2,69],
+      11:[20,4,81,0,0],12:[24,2,92,2,93],13:[26,4,107,0,0],14:[30,3,115,1,116],15:[22,5,87,1,88]},
+    M:{1:[10,1,16,0,0],2:[16,1,28,0,0],3:[26,1,44,0,0],4:[18,2,32,0,0],5:[24,2,43,0,0],
+      6:[16,4,27,0,0],7:[18,4,31,0,0],8:[22,2,38,2,39],9:[22,3,36,2,37],10:[26,4,43,1,44],
+      11:[30,1,50,4,51],12:[22,6,36,2,37],13:[22,8,37,1,38],14:[24,4,40,5,41],15:[24,5,41,5,42]}};
+  const ALIGN={1:[],2:[6,18],3:[6,22],4:[6,26],5:[6,30],6:[6,34],7:[6,22,38],8:[6,24,42],
+    9:[6,26,46],10:[6,28,50],11:[6,30,54],12:[6,32,58],13:[6,34,62],14:[6,26,46,66],15:[6,26,48,70]};
+  const VINFO={7:0x07C94,8:0x085BC,9:0x09A99,10:0x0A4D3,11:0x0BBF6,12:0x0C762,13:0x0D847,14:0x0E60D,15:0x0F928};
+  const ECB={L:1,M:0};
+  const cap=(v,ec)=>{const r=RS[ec][v];return r[1]*r[2]+r[3]*r[4];};
+  function utf8(s){const o=[];for(const ch of s){let c=ch.codePointAt(0);
+    if(c<0x80)o.push(c); else if(c<0x800)o.push(0xC0|c>>6,0x80|c&63);
+    else if(c<0x10000)o.push(0xE0|c>>12,0x80|(c>>6&63),0x80|c&63);
+    else o.push(0xF0|c>>18,0x80|(c>>12&63),0x80|(c>>6&63),0x80|c&63);} return o;}
+  function build(s,ec){
+    const by=utf8(s); let v=0;
+    for(let i=1;i<=15;i++){const cc=(i<10)?8:16;
+      if(Math.ceil((4+cc+by.length*8)/8)<=cap(i,ec)){v=i;break;}}
+    if(!v) throw new Error('too long');
+    const cc=(v<10)?8:16, bits=[];
+    const push=(val,len)=>{for(let i=len-1;i>=0;i--)bits.push((val>>i)&1);};
+    push(4,4); push(by.length,cc); by.forEach(b=>push(b,8));
+    const C=cap(v,ec), CB=C*8;
+    for(let i=0;i<4&&bits.length<CB;i++) bits.push(0);
+    while(bits.length%8) bits.push(0);
+    const data=[]; for(let i=0;i<bits.length;i+=8){let b=0;for(let j=0;j<8;j++)b=(b<<1)|bits[i+j];data.push(b);}
+    const P=[0xEC,0x11]; let k=0; while(data.length<C) data.push(P[k++%2]);
+    const[el,g1,d1,g2,d2]=RS[ec][v]; const blk=[]; let p=0;
+    for(let i=0;i<g1;i++){const d=data.slice(p,p+d1);p+=d1;blk.push({d,e:rsEnc(d,el)});}
+    for(let i=0;i<g2;i++){const d=data.slice(p,p+d2);p+=d2;blk.push({d,e:rsEnc(d,el)});}
+    const it=[], mx=Math.max(d1,d2);
+    for(let i=0;i<mx;i++) blk.forEach(b=>{if(i<b.d.length)it.push(b.d[i]);});
+    for(let i=0;i<el;i++) blk.forEach(b=>it.push(b.e[i]));
+    const fb=[]; it.forEach(b=>{for(let i=7;i>=0;i--)fb.push((b>>i)&1);});
+    return {v,bits:fb};
+  }
+  function base(v){
+    const n=v*4+17;
+    const m=Array.from({length:n},()=>new Array(n).fill(null));
+    const res=Array.from({length:n},()=>new Array(n).fill(false));
+    const S=(r,c,x)=>{m[r][c]=x;res[r][c]=true;};
+    const fp=(r,c)=>{for(let i=-1;i<=7;i++)for(let j=-1;j<=7;j++){
+      const rr=r+i,cc=c+j; if(rr<0||rr>=n||cc<0||cc>=n)continue;
+      const on=(i>=0&&i<=6&&(j===0||j===6))||(j>=0&&j<=6&&(i===0||i===6))||(i>=2&&i<=4&&j>=2&&j<=4);
+      S(rr,cc,on?1:0);}};
+    fp(0,0); fp(0,n-7); fp(n-7,0);
+    for(let i=8;i<n-8;i++){const b=(i%2===0)?1:0;S(6,i,b);S(i,6,b);}
+    const ap=ALIGN[v];
+    for(const r of ap)for(const c of ap){
+      if((r<9&&c<9)||(r<9&&c>n-10)||(r>n-10&&c<9))continue;
+      for(let i=-2;i<=2;i++)for(let j=-2;j<=2;j++)S(r+i,c+j,(Math.max(Math.abs(i),Math.abs(j))!==1)?1:0);}
+    S(n-8,8,1);
+    for(let i=0;i<9;i++){if(m[8][i]===null)S(8,i,0);if(m[i][8]===null)S(i,8,0);}
+    for(let i=0;i<8;i++){if(m[8][n-1-i]===null)S(8,n-1-i,0);if(m[n-1-i][8]===null)S(n-1-i,8,0);}
+    if(v>=7)for(let i=0;i<18;i++){const b=(VINFO[v]>>i)&1;
+      S(Math.floor(i/3),n-11+(i%3),b); S(n-11+(i%3),Math.floor(i/3),b);}
+    return {m,res,n};
+  }
+  function place(m,res,n,bits){let idx=0,up=true;
+    for(let c=n-1;c>0;c-=2){ if(c===6)c--;
+      for(let s=0;s<n;s++){const r=up?(n-1-s):s;
+        for(let k=0;k<2;k++){const cc=c-k; if(res[r][cc])continue;
+          m[r][cc]=(idx<bits.length)?bits[idx]:0; idx++;}}
+      up=!up;}}
+  const MASK=[(r,c)=>((r+c)%2)===0,(r,c)=>(r%2)===0,(r,c)=>(c%3)===0,(r,c)=>((r+c)%3)===0,
+    (r,c)=>((Math.floor(r/2)+Math.floor(c/3))%2)===0,(r,c)=>((r*c)%2+(r*c)%3)===0,
+    (r,c)=>(((r*c)%2+(r*c)%3)%2)===0,(r,c)=>(((r+c)%2+(r*c)%3)%2)===0];
+  function fmt(ec,mask){let d=(ECB[ec]<<3)|mask,v=d<<10;
+    for(let i=4;i>=0;i--) if(v&(1<<(i+10))) v^=0x537<<i;
+    return ((d<<10)|v)^0x5412;}
+  function putFmt(m,n,ec,mask){const f=fmt(ec,mask);
+    for(let i=0;i<15;i++){const b=(f>>i)&1;
+      if(i<6)m[i][8]=b; else if(i<8)m[i+1][8]=b; else m[n-15+i][8]=b;
+      if(i<8)m[8][n-1-i]=b; else if(i===8)m[8][7]=b; else m[8][14-i]=b;}
+    m[n-8][8]=1;}
+  function pen(m,n){let p=0;
+    const run=(arr)=>{let s=0,r=1;for(let i=1;i<arr.length;i++){if(arr[i]===arr[i-1])r++;else{if(r>=5)s+=3+(r-5);r=1;}}if(r>=5)s+=3+(r-5);return s;};
+    for(let r=0;r<n;r++)p+=run(m[r]);
+    for(let c=0;c<n;c++){const col=[];for(let r=0;r<n;r++)col.push(m[r][c]);p+=run(col);}
+    for(let r=0;r<n-1;r++)for(let c=0;c<n-1;c++){const a=m[r][c];
+      if(a===m[r][c+1]&&a===m[r+1][c]&&a===m[r+1][c+1])p+=3;}
+    const p1=[1,0,1,1,1,0,1,0,0,0,0],p2=[0,0,0,0,1,0,1,1,1,0,1];
+    const chk=a=>{let s=0;for(let i=0;i+11<=a.length;i++){let o1=true,o2=true;
+      for(let j=0;j<11;j++){if(a[i+j]!==p1[j])o1=false;if(a[i+j]!==p2[j])o2=false;}
+      if(o1)s+=40;if(o2)s+=40;}return s;};
+    for(let r=0;r<n;r++)p+=chk(m[r]);
+    for(let c=0;c<n;c++){const col=[];for(let r=0;r<n;r++)col.push(m[r][c]);p+=chk(col);}
+    let d=0;for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(m[r][c])d++;
+    p+=Math.floor(Math.abs(d*100/(n*n)-50)/5)*10;
+    return p;}
+  return {generate:function(str,ec){ ec=ec||'M';
+    const {v,bits}=build(str,ec), b=base(v);
+    let best=null,bp=Infinity;
+    for(let mask=0;mask<8;mask++){
+      const m=b.m.map(r=>r.slice());
+      place(m,b.res,b.n,bits);
+      for(let r=0;r<b.n;r++)for(let c=0;c<b.n;c++) if(!b.res[r][c]&&MASK[mask](r,c)) m[r][c]^=1;
+      putFmt(m,b.n,ec,mask);
+      const s=pen(m,b.n); if(s<bp){bp=s;best=m;}
+    }
+    return {modules:best,size:b.n,version:v};
+  }};
+})();
+
+/* ==================== 공통 유틸 ==================== */
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function lsGet(k,def){ try{ const v=localStorage.getItem(k); return v==null?def:v; }catch(e){ return def; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
+function lsJSON(k){ try{ return JSON.parse(lsGet(k,'{}'))||{}; }catch(e){ return {}; } }
+
+/* ==================== 자체 대화상자 ==================== */
+function dialog(html, build){
+  return new Promise(res=>{
+    const back=document.createElement('div'); back.className='dlgBack';
+    const box=document.createElement('div'); box.className='dlgBox';
+    box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true');
+    box.innerHTML=html; back.appendChild(box); document.body.appendChild(back);
+    const onKey=e=>{ if(e.key==='Escape') close(null); };
+    const close=v=>{ document.removeEventListener('keydown',onKey); back.remove(); res(v); };
+    document.addEventListener('keydown',onKey);
+    back.onclick=e=>{ if(e.target===back) close(null); };
+    build(box, close);
+  });
+}
+function askConfirm(title,msg,okTxt){
+  return dialog(`<h3>${esc(title)}</h3><p>${esc(msg)}</p>
+    <div class="dlgRow"><button type="button" data-a="0" class="ghost">취소</button>
+    <button type="button" data-a="1" class="primary">${esc(okTxt||'확인')}</button></div>`,
+    (box,close)=>{ box.querySelectorAll('[data-a]').forEach(b=>
+      b.onclick=()=>close(b.dataset.a==='1')); });
+}
+function askInput(title,msg,def,type){
+  return dialog(`<h3>${esc(title)}</h3><p>${esc(msg)}</p>
+    <input type="${type||'text'}" id="_dv" value="${esc(def)}">
+    <div class="dlgRow"><button type="button" data-a="0" class="ghost">취소</button>
+    <button type="button" data-a="1" class="primary">확인</button></div>`,
+    (box,close)=>{
+      const inp=box.querySelector('#_dv');
+      setTimeout(()=>{inp.focus();inp.select();},60);
+      inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); close(inp.value); } };
+      box.querySelectorAll('[data-a]').forEach(b=>
+        b.onclick=()=>close(b.dataset.a==='1'?inp.value:null));
+    });
+}
+/* 불러오기 목록: 선택 + 삭제 */
+function askPick(title,items){
+  return dialog(`<h3>${esc(title)}</h3>
+    <div class="dlgList">${items.map((t,i)=>`<div class="dlgItem"><button type="button" data-i="${i}">${esc(t)}</button>
+      <button type="button" class="del" data-d="${i}" title="삭제">🗑</button></div>`).join('')}</div>
+    <div class="dlgRow"><button type="button" data-a="0" class="ghost">취소</button></div>`,
+    (box,close)=>{
+      box.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>close({pick:+b.dataset.i}));
+      box.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>close({del:+b.dataset.d}));
+      box.querySelector('[data-a]').onclick=()=>close(null);
+    });
+}
+
+/* ==================== 상태 ==================== */
+const S={type:'num',size:5,maxNum:25,useFree:false,useHead:true,target:5,
+  cells:[],marked:[],phase:'setup',mk:'fill',color:'#e63946',theme:'',fs:1,
+  sel:0,hist:[],called:[],mode:'stamp',nextNum:1,editHist:[],justIdx:-1,
+  shMode:'R',tpl:'family'};
+const TPL={
+  myeong:['떡국','송편','세배','한복','윷놀이','차례','전 부치기','용돈','고속도로','친척','제기차기','강정','식혜','보름달','성묘','명절음식','귀성길','약과','한과','절','가족사진','잔소리','고스톱','나물','설거지'],
+  travel:['바다','산','호텔','비행기','기차','캐리어','지도','사진','아이스크림','기념품','맛집','온천','야시장','케이블카','일출','노을','수영장','시장','버스','렌터카','해변','등대','카페','공원','야경'],
+  birth:['케이크','촛불','선물','풍선','고깔모자','생일노래','파티','사진','친구','초대장','피자','치킨','음료','폭죽','박수','소원','카드','꽃','리본','포장지','웃음','건배','장식','쿠키','추억'],
+  food:['김치','불고기','비빔밥','삼겹살','치킨','피자','라면','떡볶이','김밥','국수','만두','짜장면','탕수육','초밥','갈비','된장찌개','순두부','냉면','부침개','족발','보쌈','칼국수','돈까스','햄버거','아이스크림'],
+  family:['할아버지','할머니','아버지','어머니','형','누나','오빠','언니','동생','삼촌','이모','고모','사촌','조카','강아지','고양이','집','밥상','거실','추억','사진첩','여행','웃음','전화','포옹'],
+  region:['서울','부산','인천','대구','대전','광주','울산','세종','수원','춘천','강릉','속초','원주','청주','천안','전주','군산','여수','순천','목포','포항','경주','안동','통영','거제','제주','서귀포','평창','공주','남원'],
+  country:['한국','미국','일본','중국','영국','프랑스','독일','이탈리아','스페인','캐나다','호주','뉴질랜드','브라질','멕시코','아르헨티나','인도','베트남','태국','필리핀','싱가포르','몽골','러시아','이집트','튀르키예','스위스','네덜란드','그리스','포르투갈','노르웨이','칠레']};
+const COLORS=['#e63946','#f4a261','#2a9d8f','#457b9d','#6a4c93','#1c1c1e'];
+const HEAD='BINGO', HEADC=['#e63946','#f4a261','#2a9d8f','#457b9d','#6a4c93'];
+const $=id=>document.getElementById(id);
+const N=()=>S.size*S.size;
+const maxLines=()=>S.size*2+2;
+const centerIdx=()=>S.size%2?Math.floor(N()/2):-1;
+const isFreeEnabled=()=>S.useFree&&S.size%2===1;
+const isFree=i=>isFreeEnabled()&&i===centerIdx();
+const clampInt=(v,min,max,def)=>{ const n=parseInt(v,10); if(isNaN(n)) return def; return Math.min(max,Math.max(min,n)); };
+let won=false;
+let tTimer;
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');
+  clearTimeout(tTimer);tTimer=setTimeout(()=>t.classList.remove('on'),1800);}
+
+/* ==================== 설정 UI ==================== */
+function bindSel(cls,fn){document.querySelectorAll('.'+cls).forEach(b=>{
+  b.onclick=()=>{document.querySelectorAll('.'+cls).forEach(x=>x.classList.remove('sel'));
+    b.classList.add('sel');fn(b);};});}
+bindSel('typeBtn',b=>{S.type=b.dataset.type;syncOpt();});
+bindSel('sizeBtn',b=>{S.size=+b.dataset.size;syncOpt();});
+bindSel('shModeBtn',b=>{S.shMode=b.dataset.sh;$('qrBox').classList.add('hide');});
+function syncOpt(){
+  $('numOpt').classList.toggle('hide',S.type!=='num');
+  $('wordOpt').classList.toggle('hide',S.type!=='word');
+  $('freeOpt').classList.toggle('hide',S.size%2===0);
+  if(S.size%2===0) S.useFree=false;
+  if((+$('maxNum').value||0)<N()) $('maxNum').value=N();
+  $('targetLines').max=maxLines();
+  if((+$('targetLines').value||0)>maxLines()) $('targetLines').value=maxLines();
+  $('bingoHeadBtn').classList.toggle('hide',S.size!==5);
+  $('freeBtn').classList.toggle('sel',S.useFree);
+  $('bingoHeadBtn').classList.toggle('sel',S.useHead);
+  document.querySelectorAll('.tplBtn').forEach(x=>x.classList.toggle('sel',x.dataset.tpl===S.tpl));
+}
+$('freeBtn').onclick=e=>{S.useFree=!S.useFree;e.currentTarget.classList.toggle('sel',S.useFree);};
+$('bingoHeadBtn').onclick=e=>{S.useHead=!S.useHead;e.currentTarget.classList.toggle('sel',S.useHead);};
+document.querySelectorAll('.tplBtn').forEach(b=>{
+  b.onclick=()=>{S.tpl=b.dataset.tpl;syncOpt();
+    toast(`「${b.textContent}」 주제 선택 · 판 만들기 후 🎲 자동 채우기`);};});
+
+/* ==================== 판 생성 ==================== */
+function freshBoard(){
+  S.cells=new Array(N()).fill(''); S.marked=new Array(N()).fill(false);
+  if(isFreeEnabled()){S.cells[centerIdx()]='FREE';S.marked[centerIdx()]=true;}
+  S.sel=firstEmpty(); S.hist=[]; S.editHist=[]; S.called=[]; S.nextNum=1; S.justIdx=-1; won=false;
+}
+$('makeBtn').onclick=()=>{
+  S.maxNum=clampInt($('maxNum').value,N(),999,Math.max(25,N()));
+  S.target=clampInt($('targetLines').value,1,maxLines(),Math.min(5,maxLines()));
+  $('maxNum').value=S.maxNum; $('targetLines').value=S.target;
+  freshBoard(); S.phase='edit';
+  if(S.type!=='num') setMode('type');
+  render(); showPhase(); window.scrollTo({top:0,behavior:'smooth'});
+};
+function firstEmpty(){for(let i=0;i<N();i++) if(!isFree(i)&&!S.cells[i]) return i; return -1;}
+
+/* ==================== 입력 방식 ==================== */
+function setMode(m){S.mode=m;
+  document.querySelectorAll('.modeBtn').forEach(x=>x.classList.toggle('sel',x.dataset.mode===m));
+  syncEditUI();}
+document.querySelectorAll('.modeBtn').forEach(b=>{
+  b.onclick=()=>{ if(b.dataset.mode==='stamp'&&S.type!=='num'){toast('순서대로 넣기는 숫자 빙고 전용입니다');return;}
+    setMode(b.dataset.mode); if(S.mode==='type'&&S.sel<0) S.sel=firstEmpty(); render(); };});
+function syncEditUI(){
+  const st=(S.phase==='edit'&&S.mode==='stamp'&&S.type==='num');
+  $('stampBar').classList.toggle('hide',!st);
+  $('typeRow').classList.toggle('hide',st||S.phase!=='edit');
+  $('modeRow').classList.toggle('hide',S.type!=='num');
+  $('editHint').textContent=st
+    ?'위에 보이는 번호가 다음에 들어갈 값입니다. 원하는 칸을 누르면 그 번호가 들어가고 자동으로 다음 번호로 넘어갑니다. 채워진 칸을 다시 누르면 지워집니다.'
+    :'칸을 누르면 그 칸이 선택됩니다. 입력창에 값을 넣고 Enter를 누르면 채워지고 자동으로 다음 빈 칸으로 넘어갑니다.';
+  if(st) drawStamp();
+}
+function usedNums(){const s=new Set();S.cells.forEach((v,i)=>{if(!isFree(i)&&v)s.add(v);});return s;}
+function advanceNum(from){const u=usedNums();
+  for(let n=from;n<=S.maxNum;n++) if(!u.has(String(n))) return n;
+  for(let n=1;n<=S.maxNum;n++) if(!u.has(String(n))) return n;
+  return null;}
+function drawStamp(){
+  const f=S.cells.filter((v,i)=>!isFree(i)&&v).length;
+  const t=N()-(isFreeEnabled()?1:0);
+  $('stampNum').textContent=S.nextNum===null?'완료':S.nextNum;
+  $('stampProg').textContent=`채운 칸 ${f} / ${t} · 범위 1~${S.maxNum}`;
+}
+$('stampPlus').onclick=()=>{ if(S.nextNum===null)return;
+  const u=usedNums();
+  for(let n=S.nextNum+1;n<=S.maxNum;n++) if(!u.has(String(n))){S.nextNum=n;drawStamp();return;}
+  toast('더 큰 번호가 없습니다');};
+$('stampMinus').onclick=()=>{
+  if(S.nextNum===null){S.nextNum=advanceNum(1);drawStamp();return;}
+  const u=usedNums();
+  for(let n=S.nextNum-1;n>=1;n--) if(!u.has(String(n))){S.nextNum=n;drawStamp();return;}
+  toast('더 작은 번호가 없습니다');};
+$('stampSet').onclick=async()=>{
+  const v=await askInput('번호 지정',`다음에 넣을 번호 (1~${S.maxNum})`,S.nextNum||1,'number');
+  if(v===null) return;
+  const n=parseInt(v,10);
+  if(isNaN(n)||n<1||n>S.maxNum){toast('범위를 벗어났습니다');return;}
+  if(usedNums().has(String(n))){toast('이미 사용한 번호입니다');return;}
+  S.nextNum=n; drawStamp();};
+
+/* ==================== 렌더 ==================== */
+function render(){
+  $('boardWrap').classList.remove('hide');
+  const hr=$('headerRow'),bd=$('board'),cols=`repeat(${S.size},1fr)`;
+  hr.style.gridTemplateColumns=cols; bd.style.gridTemplateColumns=cols;
+  hr.innerHTML='';
+  const sh=(S.size===5&&S.type==='num'&&S.useHead);
+  hr.classList.toggle('hide',!sh);
+  if(sh) for(let i=0;i<5;i++){const d=document.createElement('div');
+    d.textContent=HEAD[i];d.style.background=HEADC[i];hr.appendChild(d);}
+  bd.innerHTML='';
+  const st=(S.phase==='edit'&&S.mode==='stamp'&&S.type==='num');
+  for(let i=0;i<N();i++){
+    const c=document.createElement('div'); c.className='cell';
+    const v=S.cells[i];
+    if(isFree(i)){c.classList.add('free');c.textContent='FREE';}
+    else if(!v){c.classList.add('empty');c.textContent=S.phase==='edit'?'＋':'';}
+    else{ c.textContent=v; if(String(v).length>=4) c.classList.add('long'); }
+    if(S.phase==='edit'&&!st&&i===S.sel) c.classList.add('next');
+    if(i===S.justIdx) c.classList.add('just');
+    if(S.marked[i]&&(!isFree(i)||S.phase==='play')) paint(c);
+    c.onclick=()=>tap(i); bd.appendChild(c);
+  }
+  if(S.phase==='play') markLines();
+  if(st) drawStamp();
+  updateStat(); S.justIdx=-1;
+}
+function paint(cell){
+  if(S.mk==='fill'){cell.style.background=S.color;cell.style.color='#fff';cell.style.borderColor=S.color;return;}
+  const m=document.createElement('span'); m.className='mk'; m.style.color=S.color;
+  m.textContent=S.mk==='x'?'✕':S.mk==='o'?'○':'●';
+  if(S.mk==='stamp') m.style.opacity='.45';
+  cell.appendChild(m);
+}
+
+/* ==================== 탭 ==================== */
+function tap(i){
+  if(S.phase==='edit'){
+    if(isFree(i)) return;
+    if(S.mode==='stamp'&&S.type==='num'){
+      S.editHist.push({cells:[...S.cells],next:S.nextNum});
+      if(S.cells[i]){ const r=parseInt(S.cells[i],10); S.cells[i]=''; if(!isNaN(r)&&r<=S.maxNum) S.nextNum=r; }
+      else{
+        if(S.nextNum===null){toast('넣을 번호가 없습니다');S.editHist.pop();return;}
+        S.cells[i]=String(S.nextNum); S.justIdx=i; S.nextNum=advanceNum(S.nextNum+1);
+      }
+      render(); if(firstEmpty()<0) toast('모든 칸이 찼습니다 · 게임 시작을 누르세요'); return;
+    }
+    S.sel=i; render(); $('inp').value=S.cells[i]||''; $('inp').focus();
+  }else{
+    if(isFree(i)) return;
+    if(!S.cells[i]){toast('빈 칸입니다');return;}
+    S.hist.push([...S.marked]); S.marked[i]=!S.marked[i]; render(); checkWin();
+  }
+}
+$('undoEditBtn').onclick=()=>{
+  if(!S.editHist.length){toast('되돌릴 기록이 없습니다');return;}
+  const h=S.editHist.pop(); S.cells=h.cells; S.nextNum=h.next; S.sel=firstEmpty(); render();};
+$('inp').addEventListener('keydown',e=>{
+  if(e.key!=='Enter'||e.isComposing)return;
+  e.preventDefault();
+  const v=e.target.value.trim();
+  if(S.sel<0){toast('채울 칸을 먼저 누르세요');return;}
+  if(!v){ // 빈 값 Enter = 선택 칸 지우기
+    if(S.cells[S.sel]){S.editHist.push({cells:[...S.cells],next:S.nextNum});S.cells[S.sel]='';render();}
+    return;}
+  if(v.length>12){toast('12자 이내로 입력하세요');return;}
+  if(S.cells.some((x,i)=>i!==S.sel&&x===v)){toast('이미 있는 값입니다');return;}
+  S.editHist.push({cells:[...S.cells],next:S.nextNum});
+  S.cells[S.sel]=v; e.target.value=''; S.justIdx=S.sel; S.sel=firstEmpty(); render();
+  if(S.sel<0) toast('모든 칸이 찼습니다 · 게임 시작을 누르세요');});
+
+/* ==================== 자동/섞기/비우기 ==================== */
+function pool(){
+  if(S.type==='num'){const p=[];for(let n=1;n<=S.maxNum;n++)p.push(String(n));return p;}
+  return [...(TPL[S.tpl]||TPL.family)];
+}
+function autoFill(){
+  const need=[]; for(let i=0;i<N();i++) if(!isFree(i)) need.push(i);
+  const p=pool(); if(p.length<need.length) return false;
+  shuffle(p); need.forEach((idx,k)=>S.cells[idx]=p[k]); return true;
+}
+$('autoBtn').onclick=()=>{
+  S.editHist.push({cells:[...S.cells],next:S.nextNum});
+  if(!autoFill()){toast('값이 부족합니다');S.editHist.pop();return;}
+  S.sel=-1; S.nextNum=advanceNum(1); render(); toast('자동으로 채웠습니다');};
+$('shuffleBtn').onclick=()=>{
+  const idx=[],val=[];
+  for(let i=0;i<N();i++) if(!isFree(i)&&S.cells[i]){idx.push(i);val.push(S.cells[i]);}
+  if(!val.length){toast('채운 칸이 없습니다');return;}
+  S.editHist.push({cells:[...S.cells],next:S.nextNum});
+  shuffle(val); idx.forEach((i,k)=>S.cells[i]=val[k]); render(); toast('배치를 섞었습니다');};
+$('clearBtn').onclick=async()=>{
+  if(!await askConfirm('전체 비우기','채워진 칸을 모두 지울까요?','비우기')) return;
+  S.editHist.push({cells:[...S.cells],next:S.nextNum});
+  S.cells=new Array(N()).fill('');
+  if(isFreeEnabled()) S.cells[centerIdx()]='FREE';
+  S.sel=firstEmpty(); S.nextNum=1; render();};
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}}
+
+/* ==================== 게임 ==================== */
+$('startBtn').onclick=()=>{
+  const e=S.cells.filter((v,i)=>!isFree(i)&&!v).length;
+  if(e){toast(`빈 칸이 ${e}개 있습니다`);return;}
+  startPlay();};
+function startPlay(){
+  S.phase='play'; S.marked=new Array(N()).fill(false);
+  if(isFreeEnabled()) S.marked[centerIdx()]=true;
+  S.hist=[]; won=false; render(); showPhase(); window.scrollTo({top:0,behavior:'smooth'});
+}
+$('backEditBtn').onclick=()=>{S.phase='edit';S.sel=firstEmpty();render();showPhase();};
+$('undoBtn').onclick=()=>{
+  if(!S.hist.length){toast('되돌릴 기록이 없습니다');return;}
+  S.marked=S.hist.pop(); if(doneLines().length<S.target) won=false; render();};
+$('resetMarkBtn').onclick=async()=>{
+  if(!await askConfirm('체크 초기화','표시한 체크를 모두 지울까요?','초기화')) return;
+  S.hist.push([...S.marked]); S.marked=new Array(N()).fill(false);
+  if(isFreeEnabled()) S.marked[centerIdx()]=true;
+  won=false; render();};
+$('callInp').addEventListener('keydown',e=>{
+  if(e.key!=='Enter'||e.isComposing)return;
+  e.preventDefault();
+  const v=e.target.value.trim(); if(!v)return;
+  S.called.push(v); e.target.value=''; drawCalled();});
+function drawCalled(){
+  const el=$('calledList'); el.innerHTML='';
+  S.called.slice().reverse().forEach((v,k)=>{
+    const s=document.createElement('span'); s.textContent=v;
+    if(k===0) s.className='last'; el.appendChild(s);});}
+
+/* ==================== 판정 ==================== */
+function lines(){const n=S.size,L=[];
+  for(let r=0;r<n;r++)L.push(Array.from({length:n},(_,c)=>r*n+c));
+  for(let c=0;c<n;c++)L.push(Array.from({length:n},(_,r)=>r*n+c));
+  L.push(Array.from({length:n},(_,i)=>i*n+i));
+  L.push(Array.from({length:n},(_,i)=>i*n+(n-1-i)));
+  return L;}
+function doneLines(){return lines().filter(l=>l.every(i=>S.marked[i]));}
+function markLines(){const c=$('board').children;
+  doneLines().flat().forEach(i=>c[i]&&c[i].classList.add('linehit'));}
+function updateStat(){const c=S.phase==='play'?doneLines().length:0;
+  $('lineBadge').textContent=c+' 빙고';
+  $('progressTxt').textContent=S.phase==='play'?`목표 ${S.target}줄 · 남은 ${Math.max(0,S.target-c)}줄`:'';}
+function checkWin(){if(!won&&doneLines().length>=S.target){won=true;celebrate();}}
+
+/* ==================== 축하 ==================== */
+function celebrate(){
+  dialog(`<h3 style="font-size:30px;text-align:center;margin-bottom:6px">🎉 빙고!</h3>
+    <p style="text-align:center">${S.target}줄을 완성했습니다</p>
+    <div class="dlgRow"><button type="button" data-a="1" class="primary">계속하기</button></div>`,
+    (box,close)=>{box.querySelector('[data-a]').onclick=()=>close(true);});
+  fireworks(); beep();
+}
+const fx=$('fx'),ctx=fx.getContext('2d');
+function fireworks(){
+  fx.width=innerWidth; fx.height=innerHeight;
+  const P=[];
+  for(let b=0;b<4;b++){
+    const cx=innerWidth*(.25+Math.random()*.5),cy=innerHeight*(.25+Math.random()*.35);
+    const col=COLORS[(Math.random()*COLORS.length)|0];
+    for(let i=0;i<46;i++){const a=Math.random()*Math.PI*2,sp=2+Math.random()*5;
+      P.push({x:cx,y:cy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,c:col,l:1,d:b*8});}}
+  let f=0;
+  (function loop(){
+    ctx.clearRect(0,0,fx.width,fx.height); let alive=false;
+    P.forEach(p=>{ if(f<p.d){alive=true;return;}
+      p.x+=p.vx;p.y+=p.vy;p.vy+=.09;p.vx*=.99;p.l-=.012;
+      if(p.l>0){alive=true;ctx.globalAlpha=Math.max(p.l,0);ctx.fillStyle=p.c;
+        ctx.beginPath();ctx.arc(p.x,p.y,3,0,7);ctx.fill();}});
+    ctx.globalAlpha=1;f++;
+    if(alive)requestAnimationFrame(loop); else ctx.clearRect(0,0,fx.width,fx.height);})();
+}
+let AC=null;
+function beep(){try{
+  AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==='suspended') AC.resume();
+  [523,659,784,1047].forEach((f,i)=>{
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.type='triangle';o.frequency.value=f;o.connect(g);g.connect(AC.destination);
+    const t=AC.currentTime+i*.12;
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(.22,t+.03);
+    g.gain.exponentialRampToValueAtTime(.0001,t+.3);
+    o.start(t);o.stop(t+.32);});}catch(e){}}
+
+/* ==================== 같이 하기 (QR / 링크) ==================== */
+function makeCode(){
+  const p=[S.shMode,S.type,S.size,S.maxNum,isFreeEnabled()?1:0,S.useHead?1:0,S.target,S.theme||''];
+  if(S.shMode==='S') p.push(S.cells.map((v,i)=>isFree(i)?'':String(v).replace(/[|~]/g,'')).join('~'));
+  else p.push(S.type==='word'?S.tpl:'');
+  return p.join('|');
+}
+function localBase(){
+  const b=location.href.split('#')[0];
+  return /^https?:/i.test(b) ? b : '';
+}
+function savedBase(){ return lsGet('fbingo_base',''); }
+function shareBase(){
+  let b=$('baseUrl').value.trim();
+  if(b){
+    if(!/^https?:\/\//i.test(b)) b='https://'+b;
+    lsSet('fbingo_base',b);
+    return b;
+  }
+  return localBase();
+}
+function makeShareUrl(){
+  const base=shareBase();
+  if(!base) return null;
+  return base.split('#')[0]+'#g='+encodeURIComponent(makeCode());
+}
+function syncBaseHint(){
+  const lb=localBase();
+  const el=$('baseHint');
+  if(lb){
+    el.innerHTML='지금 페이지 주소로 QR을 만듭니다. 다른 주소를 쓰려면 위 칸에 입력하세요.';
+  }else{
+    el.innerHTML='⚠️ 지금은 <b>인터넷 주소가 없는 상태</b>(파일 열기 또는 미리보기)라 QR을 만들 수 없습니다. '+
+      '이 페이지 주소를 위 칸에 입력하시거나, 아래 <b>참가 코드</b>를 이용하세요.';
+  }
+}
+function applyShare(str){
+  try{
+    const p=decodeURIComponent(str).split('|');
+    if(p.length<9) return false;
+    const [mode,type,size,mx,fr,hd,tg,th,payload]=p;
+    S.type=(type==='word')?'word':'num';
+    S.size=clampInt(size,3,5,5);
+    S.maxNum=clampInt(mx,S.size*S.size,999,Math.max(25,S.size*S.size));
+    S.useFree=(fr==='1'); S.useHead=(hd==='1');
+    S.target=clampInt(tg,1,maxLines(),3);
+    const okTh=['','t-hanbok','t-birth','t-travel','t-dark'];
+    if(okTh.includes(th)){document.body.className=th;S.theme=th;
+      document.querySelectorAll('.thBtn').forEach(b=>b.classList.toggle('sel',b.dataset.th===th));}
+    freshBoard();
+    if(mode==='S'&&payload){
+      const arr=payload.split('~');
+      for(let i=0;i<N();i++){ if(isFree(i)) continue; S.cells[i]=(arr[i]||'').slice(0,12); }
+    }else{
+      if(S.type==='word'&&payload&&TPL[payload]) S.tpl=payload;
+      autoFill();
+    }
+    S.phase='edit'; S.nextNum=advanceNum(1);
+    document.querySelectorAll('.typeBtn').forEach(b=>b.classList.toggle('sel',b.dataset.type===S.type));
+    document.querySelectorAll('.sizeBtn').forEach(b=>b.classList.toggle('sel',+b.dataset.size===S.size));
+    $('maxNum').value=S.maxNum; $('targetLines').value=S.target;
+    if(S.type!=='num') setMode('type');
+    syncOpt(); render(); startPlay();
+    toast('공유받은 판을 불러왔습니다');
+    return true;
+  }catch(e){ return false; }
+}
+function drawQR(text){
+  const cv=$('qrCanvas'), g=cv.getContext('2d');
+  let q;
+  try{ q=QR.generate(text,'L'); }
+  catch(e){ toast('주소가 너무 깁니다. 「각자 다른 판」을 이용하세요'); return false; }
+  const px=8, quiet=4, sz=(q.size+quiet*2)*px;
+  cv.width=sz; cv.height=sz;
+  cv.style.width='210px'; cv.style.height='210px';
+  g.fillStyle='#fff'; g.fillRect(0,0,sz,sz);
+  g.fillStyle='#000';
+  for(let r=0;r<q.size;r++) for(let c=0;c<q.size;c++)
+    if(q.modules[r][c]) g.fillRect((c+quiet)*px,(r+quiet)*px,px,px);
+  return true;
+}
+function emptyCount(){ return S.cells.filter((v,i)=>!isFree(i)&&!v).length; }
+$('qrBtn').onclick=()=>{
+  if(S.shMode==='S'){
+    const e=emptyCount();
+    if(e){toast(`빈 칸이 ${e}개 있어 공유할 수 없습니다`);return;}
+  }
+  const url=makeShareUrl();
+  if(!url){
+    $('qrBox').classList.add('hide');
+    $('fileWarn').innerHTML='📵 <b>QR을 만들 수 없습니다.</b><br>'+
+      '이 페이지가 인터넷 주소(https://…)로 열려 있지 않기 때문입니다. '+
+      'QR은 주소를 담는 것이라, 내 컴퓨터 안의 파일 경로는 다른 휴대폰이 열 수 없습니다.<br><br>'+
+      '<b>해결 방법 두 가지</b><br>'+
+      '① 이 페이지의 인터넷 주소를 위 칸에 입력<br>'+
+      '② 아래 <b>참가 코드 만들기</b>를 사용 (주소 없이도 가능)';
+    $('fileWarn').classList.remove('hide');
+    toast('인터넷 주소가 필요합니다');
+    return;
+  }
+  if(!drawQR(url)) return;
+  $('shareUrl').textContent=url;
+  $('qrBox').classList.remove('hide');
+  $('fileWarn').classList.add('hide');
+  toast('QR을 만들었습니다');
+};
+/* ---- 참가 코드 (주소 없이 공유) ---- */
+$('codeBtn').onclick=async()=>{
+  if(S.shMode==='S'){
+    const e=emptyCount();
+    if(e){toast(`빈 칸이 ${e}개 있어 공유할 수 없습니다`);return;}
+  }
+  const code=makeCode();
+  const v=await askInput('참가 코드',
+    '이 코드를 카톡으로 보내세요. 받은 사람은 「코드로 참가」에 붙여넣으면 됩니다.', code);
+  if(v!==null){
+    try{ await navigator.clipboard.writeText(code); toast('코드를 복사했습니다'); }
+    catch(e){ toast('코드를 길게 눌러 복사하세요'); }
+  }
+};
+$('joinBtn').onclick=async()=>{
+  const v=await askInput('코드로 참가','받은 참가 코드나 링크를 붙여넣으세요.','');
+  if(!v) return;
+  let s=v.trim();
+  const i=s.indexOf('#g=');
+  try{ if(i>=0) s=decodeURIComponent(s.slice(i+3)); }catch(e){}
+  if(!applyShare(encodeURIComponent(s))) toast('코드를 읽을 수 없습니다');
+};
+$('copyBtn').onclick=async()=>{
+  const url=$('shareUrl').textContent;
+  try{ await navigator.clipboard.writeText(url); toast('링크를 복사했습니다'); }
+  catch(e){ await askInput('링크 복사','아래 주소를 길게 눌러 복사하세요',url); }
+};
+$('qrSaveBtn').onclick=()=>{
+  const a=document.createElement('a');
+  a.download='빙고_QR.png'; a.href=$('qrCanvas').toDataURL('image/png'); a.click();
+  toast('QR을 저장했습니다');
+};
+
+/* ==================== 꾸미기 ==================== */
+bindSel('mkBtn',b=>{S.mk=b.dataset.mk;render();});
+bindSel('thBtn',b=>{document.body.className=b.dataset.th;S.theme=b.dataset.th;});
+COLORS.forEach((c,i)=>{
+  const b=document.createElement('button');
+  b.type='button'; b.setAttribute('aria-label','체크 색상 '+(i+1));
+  b.className='swatch'+(i===0?' sel':''); b.style.background=c;
+  b.onclick=()=>{document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('sel'));
+    b.classList.add('sel');S.color=c;render();};
+  $('colorRow').appendChild(b);});
+$('fsRange').oninput=e=>{S.fs=e.target.value/100;
+  document.documentElement.style.setProperty('--fs',S.fs);
+  $('fsVal').textContent=e.target.value+'%';};
+
+/* ==================== 저장 ==================== */
+$('saveBtn').onclick=async()=>{
+  const name=await askInput('판 저장','이 판을 어떤 이름으로 저장할까요?',
+    '빙고 '+new Date().toLocaleDateString('ko-KR'));
+  if(!name||!name.trim()) return;
+  const all=lsJSON('fbingo');
+  all[name.trim()]={type:S.type,size:S.size,useFree:S.useFree,useHead:S.useHead,
+             target:S.target,maxNum:S.maxNum,cells:S.cells,tpl:S.tpl};
+  toast(lsSet('fbingo',JSON.stringify(all))?'저장했습니다':'이 브라우저에서는 저장할 수 없습니다');};
+$('loadBtn').onclick=async()=>{
+  const all=lsJSON('fbingo');
+  const keys=Object.keys(all);
+  if(!keys.length){toast('저장된 판이 없습니다');return;}
+  const r=await askPick('불러올 판 선택',keys);
+  if(!r) return;
+  if(r.del!=null){
+    if(!await askConfirm('판 삭제',`「${keys[r.del]}」을(를) 삭제할까요?`,'삭제')) return;
+    delete all[keys[r.del]]; lsSet('fbingo',JSON.stringify(all)); toast('삭제했습니다'); return;
+  }
+  const d=all[keys[r.pick]]; if(!d||!Array.isArray(d.cells)){toast('판을 읽을 수 없습니다');return;}
+  Object.assign(S,d);
+  S.marked=new Array(N()).fill(false);
+  if(isFreeEnabled()) S.marked[centerIdx()]=true;
+  S.phase='edit'; S.sel=firstEmpty(); S.hist=[]; S.editHist=[]; S.called=[]; won=false;
+  S.nextNum=advanceNum(1);
+  document.querySelectorAll('.sizeBtn').forEach(b=>b.classList.toggle('sel',+b.dataset.size===S.size));
+  document.querySelectorAll('.typeBtn').forEach(b=>b.classList.toggle('sel',b.dataset.type===S.type));
+  $('maxNum').value=S.maxNum; $('targetLines').value=S.target;
+  setMode(S.type==='num'?S.mode:'type');
+  syncOpt(); render(); showPhase(); toast('불러왔습니다');};
+$('imgBtn').onclick=()=>{
+  const n=S.size,SZ=150,PAD=30,HH=(S.size===5&&S.type==='num'&&S.useHead)?70:0;
+  const cv=document.createElement('canvas');
+  cv.width=PAD*2+SZ*n; cv.height=PAD*2+HH+SZ*n;
+  const x=cv.getContext('2d');
+  x.fillStyle='#fff'; x.fillRect(0,0,cv.width,cv.height);
+  if(HH) for(let i=0;i<5;i++){
+    x.fillStyle=HEADC[i]; x.fillRect(PAD+i*SZ,PAD,SZ,HH);
+    x.fillStyle='#fff'; x.font='bold 40px sans-serif';
+    x.textAlign='center'; x.textBaseline='middle';
+    x.fillText(HEAD[i],PAD+i*SZ+SZ/2,PAD+HH/2);}
+  const top=PAD+HH;
+  for(let i=0;i<N();i++){
+    const r=(i/n)|0,c=i%n,px=PAD+c*SZ,py=top+r*SZ;
+    const fl=S.marked[i]&&S.mk==='fill'&&!isFree(i);
+    x.fillStyle=fl?S.color:(isFree(i)?'#f1f1f3':'#fff');
+    x.fillRect(px,py,SZ,SZ);
+    x.strokeStyle='#1c1c1e'; x.lineWidth=3; x.strokeRect(px,py,SZ,SZ);
+    x.fillStyle=fl?'#fff':'#1c1c1e';
+    const t=isFree(i)?'FREE':(S.cells[i]||'');
+    x.font='bold '+(t.length>4?26:t.length>2?34:46)+'px sans-serif';
+    x.textAlign='center'; x.textBaseline='middle';
+    x.fillText(t,px+SZ/2,py+SZ/2,SZ-16);
+    if(S.marked[i]&&!isFree(i)&&S.mk!=='fill'){
+      x.fillStyle=S.color; x.globalAlpha=S.mk==='stamp'?.45:1;
+      x.font='bold 90px sans-serif';
+      x.fillText(S.mk==='x'?'✕':S.mk==='o'?'○':'●',px+SZ/2,py+SZ/2);
+      x.globalAlpha=1;}}
+  const a=document.createElement('a');
+  a.download='빙고.png'; a.href=cv.toDataURL('image/png'); a.click();
+  toast('이미지를 저장했습니다');};
+
+/* ==================== 새로 만들기 ==================== */
+$('newBtn').onclick=async()=>{
+  const ok=await askConfirm('처음부터 새로 만들기',
+    '지금 판을 버리고 설정 화면으로 돌아갑니다.','새로 만들기');
+  if(!ok) return;
+  S.phase='setup'; won=false;
+  S.cells=[]; S.marked=[]; S.hist=[]; S.editHist=[]; S.called=[];
+  S.nextNum=1; S.sel=0; S.justIdx=-1;
+  if(location.hash.indexOf('#g=')===0) history.replaceState(null,'',location.pathname+location.search);
+  $('boardWrap').classList.add('hide');
+  $('qrBox').classList.add('hide');
+  $('calledList').innerHTML='';
+  showPhase();
+  window.scrollTo({top:0,behavior:'smooth'});
+  toast('설정 화면으로 돌아왔습니다');
+};
+
+/* ==================== 화면 전환 ==================== */
+function showPhase(){
+  const p=S.phase;
+  $('setupCard').classList.toggle('hide',p!=='setup');
+  $('editCard').classList.toggle('hide',p!=='edit');
+  $('playCard').classList.toggle('hide',p!=='play');
+  $('playBar').classList.toggle('hide',p!=='play');
+  $('shareCard').classList.toggle('hide',p==='setup');
+  if(p!=='setup') syncBaseHint();
+  $('styleCard').classList.toggle('hide',p==='setup');
+  $('saveCard').classList.toggle('hide',p==='setup');
+  $('adCard').classList.toggle('hide',p==='setup');
+  $('newCard').classList.toggle('hide',p==='setup');
+  syncEditUI();
+  if(p==='play') drawCalled();
+  updateStat();
+}
+
+/* ==================== 사용방법 링크 (#guide, #g-xxx) ==================== */
+function openGuideFromHash(){
+  const h=location.hash;
+  if(!h||h.indexOf('#g=')===0) return;
+  const el=document.getElementById(h.slice(1));
+  if(!el) return;
+  if(el.tagName==='DETAILS') el.open=true;
+  setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),50);
+}
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    const id=a.getAttribute('href').slice(1);
+    const el=document.getElementById(id); if(!el) return;
+    e.preventDefault();
+    if(el.tagName==='DETAILS') el.open=true;
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+});
+addEventListener('hashchange',openGuideFromHash);
+
+/* ==================== 시작 ==================== */
+syncOpt();
+$('baseUrl').value=savedBase();
+(function init(){
+  const h=location.hash;
+  if(h&&h.indexOf('#g=')===0){ if(applyShare(h.slice(3))) return; }
+  showPhase();
+  openGuideFromHash();
+})();
+addEventListener('resize',()=>{fx.width=innerWidth;fx.height=innerHeight;});
+</script>
+</body>
+</html>
